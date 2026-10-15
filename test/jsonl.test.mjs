@@ -30,12 +30,24 @@ test('validateJsonl accepts valid JSONL and blank lines (LF and CRLF)', () => {
   assert.equal(res.pairs[1].output, 'A2');
 });
 
-test('validateJsonl rejects non-string fields, primitives, arrays, and malformed JSON', () => {
+test('validateJsonl rejects non-string fields, primitives, arrays, and malformed JSON with line numbers', () => {
   assert.equal(validateJsonl(null).valid, false);
-  assert.equal(validateJsonl('not json').valid, false);
+  const badSyntax = validateJsonl('{"instruction":"ok","output":"ok"}\nnot json');
+  assert.equal(badSyntax.valid, false);
+  assert.match(badSyntax.error, /line 2/i);
   assert.equal(validateJsonl('null').valid, false);
   assert.equal(validateJsonl('[]').valid, false);
   assert.equal(validateJsonl('{"instruction":"only"}').valid, false);
   assert.equal(validateJsonl('{"instruction":null,"output":"str"}').valid, false);
   assert.equal(validateJsonl('{"instruction":"str","output":123}').valid, false);
+  assert.equal(validateJsonl('{"instruction":"str","input":123,"output":"str"}').valid, false);
 });
+
+test('validateJsonl and formatJsonl preserve optional string input field', () => {
+  const raw = '{"instruction":"Parse","input":"زيد قائم","output":"مبتدأ وخبر"}';
+  const res = validateJsonl(raw);
+  assert.equal(res.valid, true);
+  assert.equal(res.pairs[0].input, 'زيد قائم');
+  assert.equal(formatJsonl(res.pairs), raw);
+});
+
