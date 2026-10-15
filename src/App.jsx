@@ -122,6 +122,9 @@ function App() {
   };
 
   const handleCloudLoad = async () => {
+    if (pairs.length > 0 && !confirm("Overwrite current dataset with cloud save?")) {
+      return;
+    }
     const rawCode = saveCode.trim() || prompt("Enter 6-character Save Code:");
     const code = rawCode ? rawCode.trim().toUpperCase() : '';
     if (!code) return;
