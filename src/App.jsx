@@ -1,10 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from './lib/supabase';
+import { formatJsonl, validateJsonl } from './lib/jsonl';
 
 function App() {
   const [pairs, setPairs] = useState(() => {
     const saved = localStorage.getItem('lora_dataset_pairs');
-    try { return saved ? JSON.parse(saved) : []; } catch { return []; }
+    try {
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   });
   const [instruction, setInstruction] = useState(() => {
     return localStorage.getItem('lora_dataset_instruction') || '';
@@ -49,9 +55,7 @@ function App() {
     }
   };
 
-  const getJsonlText = () => {
-    return pairs.map(p => JSON.stringify({ instruction: p.instruction, output: p.output })).join('\n');
-  };
+  const getJsonlText = () => formatJsonl(pairs);
 
   const handleDownload = () => {
     const text = getJsonlText();
@@ -68,7 +72,7 @@ function App() {
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(getJsonlText());
+    navigator.clipboard.writeText(getJsonlText()).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -84,7 +88,7 @@ function App() {
     }
     setIsCloudSaving(true);
     try {
-      let code = saveCode.trim() || generateSaveCode();
+      let code = saveCode.trim().toUpperCase() || generateSaveCode();
       if (!saveCode.trim()) {
         setSaveCode(code);
       }
@@ -118,7 +122,8 @@ function App() {
   };
 
   const handleCloudLoad = async () => {
-    const code = prompt("Enter 6-character Save Code:");
+    const rawCode = saveCode.trim() || prompt("Enter 6-character Save Code:");
+    const code = rawCode ? rawCode.trim().toUpperCase() : '';
     if (!code) return;
     
     setIsCloudLoading(true);
@@ -126,14 +131,17 @@ function App() {
       const { data, error } = await supabase
         .from('datasets')
         .select('pairs')
-        .eq('save_code', code.toUpperCase())
+        .eq('save_code', code)
         .single();
         
       if (error || !data) {
         alert("Save code not found.");
       } else {
-        setPairs(data.pairs);
-        setSaveCode(code.toUpperCase());
+        const loadedPairs = Array.isArray(data.pairs) ? data.pairs : [];
+        setPairs(loadedPairs);
+        setEditing(false);
+        setSyntaxError(false);
+        setSaveCode(code);
         alert("Loaded successfully.");
       }
     } catch (err) {
@@ -141,24 +149,6 @@ function App() {
       alert("Cloud load failed.");
     } finally {
       setIsCloudLoading(false);
-    }
-  };
-
-  // Validate JSONL: each non-empty line must be valid JSON with instruction & output keys
-  const validateJsonl = (text) => {
-    const lines = text.split('\n').filter(l => l.trim() !== '');
-    if (lines.length === 0) return { valid: true, pairs: [] };
-    try {
-      const parsed = lines.map(line => {
-        const obj = JSON.parse(line);
-        if (typeof obj.instruction === 'undefined' || typeof obj.output === 'undefined') {
-          throw new Error('Missing keys');
-        }
-        return { instruction: obj.instruction, output: obj.output, id: Date.now() + Math.random() };
-      });
-      return { valid: true, pairs: parsed };
-    } catch {
-      return { valid: false, pairs: [] };
     }
   };
 

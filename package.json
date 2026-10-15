@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test": "node --test test/jsonl.test.mjs",
     "verify:hosts": "node scripts/verify-hostnames.mjs"
   },
   "dependencies": {
